@@ -81,8 +81,17 @@ const start = async () => {
     );
   }
 
-  if (version) {
+  if (version && version !== "timeout") {
     addSystem(`qodercli detected: ${version}`, "info", "startup");
+  } else if (version === "timeout") {
+    addSystem(
+      "qodercli check timed out after 20s — binary may exist but failed to start",
+      "error",
+      "startup",
+    );
+    console.warn(
+      "⚠️  qodercli check timed out after 20s. Set QODERCLI_BIN (e.g. /usr/local/bin/qodercli) and verify container CPU/memory limits.",
+    );
   } else {
     addSystem(
       "qodercli not found on PATH — requests will fail",

@@ -1,6 +1,7 @@
 FROM node:20-slim
 
 ENV PATH="/usr/local/bin:${PATH}"
+ENV QODERCLI_BIN="/usr/local/bin/qodercli"
 
 # Install qodercli globally — uses QODER_PERSONAL_ACCESS_TOKEN env var at runtime for auth.
 # node:20-slim is Debian-based (glibc) which is required by qodercli's Bun runtime.

@@ -1,4 +1,5 @@
 const { spawn } = require("child_process");
+const fs = require("fs");
 const { addSystem } = require("../store/logStore");
 const config = require("../config");
 
@@ -12,16 +13,31 @@ const qoderEnv = () => ({
     : {}),
 });
 
+const getQoderCliCommand = () => {
+  if (process.platform === "win32") return { cmd: "qodercli.cmd", viaCmd: true };
+
+  // Allow explicit override in container/runtime env.
+  if (process.env.QODERCLI_BIN) return { cmd: process.env.QODERCLI_BIN, viaCmd: false };
+
+  // Common global npm binary locations in Linux containers.
+  const candidates = ["/usr/local/bin/qodercli", "/usr/bin/qodercli", "qodercli"];
+  for (const c of candidates) {
+    if (c.includes("/") && fs.existsSync(c)) return { cmd: c, viaCmd: false };
+  }
+  return { cmd: "qodercli", viaCmd: false };
+};
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 const spawnQoderCli = (prompt, model, flags = []) => {
+  const qoder = getQoderCliCommand();
   if (process.platform === "win32") {
     // On Windows, pass a cmd-safe prompt to avoid shell interpretation of
     // special characters (&, |, >, <, ^, ").
     const safePrompt = prompt.replace(/"/g, '\\"').replace(/[&|<>^]/g, "^$&");
-    const args = ["/c", "qodercli.cmd", "-p", safePrompt, "-f", "stream-json"];
+    const args = ["/c", qoder.cmd, "-p", safePrompt, "-f", "stream-json"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
     return spawn("cmd.exe", args, {
@@ -32,7 +48,7 @@ const spawnQoderCli = (prompt, model, flags = []) => {
     const args = ["-p", prompt, "-f", "stream-json"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
-    return spawn("qodercli", args, {
+    return spawn(qoder.cmd, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: qoderEnv(),
     });
@@ -207,13 +223,14 @@ const checkQoderCli = () =>
       }
     };
 
+    const qoder = getQoderCliCommand();
     const child =
       process.platform === "win32"
-        ? spawn("cmd.exe", ["/c", "qodercli.cmd", "--version"], {
+        ? spawn("cmd.exe", ["/c", qoder.cmd, "--version"], {
             stdio: ["ignore", "pipe", "pipe"],
             env: qoderEnv(),
           })
-        : spawn("qodercli", ["--version"], {
+        : spawn(qoder.cmd, ["--version"], {
             stdio: ["ignore", "pipe", "pipe"],
             env: qoderEnv(),
           });
@@ -237,8 +254,8 @@ const checkQoderCli = () =>
     // Hard timeout of 5 s so startup is never blocked
     setTimeout(() => {
       child.kill();
-      finish(null);
-    }, 5000);
+      finish("timeout");
+    }, 20000);
   });
 
 module.exports = { runQoderRequest, checkQoderCli };

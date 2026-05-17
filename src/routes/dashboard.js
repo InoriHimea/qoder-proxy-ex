@@ -11,6 +11,20 @@ const { checkQoderCli, runQoderRequest } = require('../helpers/spawn');
 const router     = express.Router();
 const PUBLIC_DIR = path.join(__dirname, '..', 'dashboard', 'public');
 
+const statusCache = {
+  checkedAt: 0,
+  version: null,
+};
+
+const refreshQoderStatus = async () => {
+  const version = await checkQoderCli();
+  statusCache.version = version;
+  statusCache.checkedAt = Date.now();
+  return version;
+};
+
+refreshQoderStatus().catch(() => {});
+
 // ── Static assets ────────────────────────────────────────────────────────────
 router.use('/static', express.static(PUBLIC_DIR));
 
@@ -55,10 +69,14 @@ router.get('/api/config', (req, res) => {
 
 // ── API — status ─────────────────────────────────────────────────────────────
 router.get('/api/status', async (_req, res) => {
-  const version = await checkQoderCli();
+  const now = Date.now();
+  if (now - statusCache.checkedAt > 30000) {
+    refreshQoderStatus().catch(() => {});
+  }
+  const version = statusCache.version;
   const mem     = process.memoryUsage();
   res.json({
-    status:      version ? 'ok' : 'degraded',
+    status:      version && version !== 'timeout' ? 'ok' : 'degraded',
     qodercli:    version || 'unavailable',
     uptime:      process.uptime(),
     memoryMB:    (mem.rss / 1024 / 1024).toFixed(1),
@@ -73,7 +91,7 @@ router.get('/api/models', (_req, res) => res.json({ models: QODER_MODELS }));
 
 // ── API — playground chat (SSE) ──────────────────────────────────────────────
 router.post('/api/chat', (req, res) => {
-  const { messages, model: requestedModel = 'lite' } = req.body;
+  const { messages, model: requestedModel = 'auto' } = req.body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages is required and must be a non-empty array' });
   }

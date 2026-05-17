@@ -6,7 +6,7 @@ const state = {
   page: 'endpoints',
   config: {},
   models: [],
-  chat: { messages: [], model: 'lite', streaming: false },
+  chat: { messages: [], model: 'auto', streaming: false },
   logs: { entries: [], filter: '', autoRefresh: false, timer: null, expanded: null },
   sysLogs: { entries: [], autoRefresh: false, timer: null },
 };
@@ -143,8 +143,8 @@ function renderEndpoints() {
 
   const endpoints = [
     { method:'GET',  path:'/v1/models',            desc:'List all available models and aliases.',        curl:`curl ${v1}/models${key ? ` \\\n  -H "Authorization: Bearer ${key}"` : ''}` },
-    { method:'POST', path:'/v1/chat/completions',  desc:'OpenAI-compatible chat completions (streaming supported).', curl:`curl ${v1}/chat/completions \\\n  -H "Content-Type: application/json"${key ? ` \\\n  -H "Authorization: Bearer ${key}"` : ''} \\\n  -d '{"model":"lite","messages":[{"role":"user","content":"Hello!"}]}'` },
-    { method:'POST', path:'/v1/completions',       desc:'Legacy text completions endpoint.',             curl:`curl ${v1}/completions \\\n  -H "Content-Type: application/json"${key ? ` \\\n  -H "Authorization: Bearer ${key}"` : ''} \\\n  -d '{"model":"lite","prompt":"Once upon a time"}'` },
+    { method:'POST', path:'/v1/chat/completions',  desc:'OpenAI-compatible chat completions (streaming supported).', curl:`curl ${v1}/chat/completions \\\n  -H "Content-Type: application/json"${key ? ` \\\n  -H "Authorization: Bearer ${key}"` : ''} \\\n  -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}'` },
+    { method:'POST', path:'/v1/completions',       desc:'Legacy text completions endpoint.',             curl:`curl ${v1}/completions \\\n  -H "Content-Type: application/json"${key ? ` \\\n  -H "Authorization: Bearer ${key}"` : ''} \\\n  -d '{"model":"auto","prompt":"Once upon a time"}'` },
     { method:'GET',  path:'/health',               desc:'Health check — returns qodercli version and server status.',curl:`curl ${base}/health` },
   ];
 
@@ -219,7 +219,7 @@ function renderPlayground() {
       <div class="pg-toolbar">
         <div class="model-select-wrap" id="model-wrap">
           <button class="model-select-btn" id="model-btn" onclick="toggleModelDropdown()">
-            <span id="model-label-display">lite</span>
+            <span id="model-label-display">auto</span>
             <span class="tier-badge tier-free" id="model-tier-display">free</span>
             <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>

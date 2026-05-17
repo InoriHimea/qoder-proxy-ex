@@ -3,6 +3,15 @@ const fs = require("fs");
 const { addSystem } = require("../store/logStore");
 const config = require("../config");
 
+const isBenignQoderStderr = (text) => {
+  if (!text) return false;
+  return (
+    text.includes("failed to asynchronously prepare wasm") ||
+    text.includes('function="_abort_js"') ||
+    text.includes("Aborted(LinkError: WebAssembly.instantiate()")
+  );
+};
+
 // Build the environment for every qodercli child process.
 // config.QODER_PAT normalises both QODER_PERSONAL_ACCESS_TOKEN and QODER_API_KEY,
 // so we always pass it under the name qodercli actually looks for.
@@ -117,10 +126,6 @@ const deepFindText = (value, depth = 0) => {
         const t = deepFindText(value[key], depth + 1);
         if (t) return t;
       }
-    }
-    for (const key of Object.keys(value)) {
-      const t = deepFindText(value[key], depth + 1);
-      if (t) return t;
     }
   }
   return "";
@@ -316,7 +321,9 @@ const runQoderRequest = ({
   child.stderr.on("data", (chunk) => {
     const text = chunk.toString().trim();
     stderrOutput += text + "\n";
-    addSystem(text, "error", "qodercli-stderr");
+    if (!isBenignQoderStderr(text)) {
+      addSystem(text, "error", "qodercli-stderr");
+    }
   });
 
   child.on("close", (code, signal) => {

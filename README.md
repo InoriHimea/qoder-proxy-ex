@@ -49,6 +49,33 @@ docker run -d \
 
 ---
 
+## ⚠️ Resource Requirements (Known qodercli Spike Behavior)
+
+This proxy spawns `qodercli` per request. During active generation, **CPU and RAM can spike sharply**, then drop back down after the response completes. This is expected behavior for the current wrapper design.
+
+Typical observed pattern:
+- CPU spikes during generation (short bursts can exceed 100% on multi-core hosts)
+- RAM spikes during generation (can approach ~1 GB on heavier prompts/output)
+- Memory drops back near baseline after completion
+
+Recommended minimum sizing:
+
+### Retail PC (local/self-host)
+- **CPU**: 4 physical cores recommended (2 cores minimum for light testing)
+- **RAM**: 8 GB system RAM recommended (4 GB minimum for light testing)
+
+### Cloud VM / Container Host
+- **Minimum**: 2 vCPU + 2 GB RAM
+- **Recommended**: 4 vCPU + 4 GB RAM
+- For concurrent traffic, plan roughly **1 active request per 1–2 vCPU** to avoid latency spikes or process kills.
+
+Practical stability tips:
+- Keep `QODER_MAX_OUTPUT_TOKENS=16k` unless you specifically need larger outputs
+- Avoid high concurrency on small instances
+- If the platform enforces strict memory limits, increase container memory to reduce `SIGKILL` risk
+
+---
+
 ## 🌐 The Admin Dashboard
 
 The built-in web dashboard provides full observability into what your proxy is doing. Access it at `http://your-server-ip:3000/dashboard/`.

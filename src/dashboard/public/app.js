@@ -160,7 +160,7 @@ function renderEndpoints() {
       </div>
     </div>`).join('');
 
-  const compat = ['OpenAI Python SDK','LangChain','LM Studio','Cursor','Continue.dev','Open WebUI','Aider','Cline','AnythingLLM'];
+  const compat = ['OpenAI Python SDK','OpenAI Node SDK','LangChain','Open WebUI','AnythingLLM'];
 
   const isHttp = base.startsWith('http://');
   const httpsWarning = isHttp ? `

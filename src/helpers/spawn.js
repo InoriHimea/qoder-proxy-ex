@@ -76,6 +76,80 @@ const hasVisibleAssistantText = (data) => {
   });
 };
 
+const deepFindText = (value, depth = 0) => {
+  if (depth > 6 || value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const t = deepFindText(item, depth + 1);
+      if (t) return t;
+    }
+    return "";
+  }
+  if (typeof value === "object") {
+    // Prefer common text-bearing keys first.
+    const priorityKeys = [
+      "text",
+      "value",
+      "result",
+      "output",
+      "content",
+      "message",
+      "final",
+      "answer",
+    ];
+    for (const key of priorityKeys) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const t = deepFindText(value[key], depth + 1);
+        if (t) return t;
+      }
+    }
+    for (const key of Object.keys(value)) {
+      const t = deepFindText(value[key], depth + 1);
+      if (t) return t;
+    }
+  }
+  return "";
+};
+
+const extractEventText = (data) => {
+  if (!data || typeof data !== "object") return "";
+
+  // 1) Primary assistant message content
+  const msgContent = data?.message?.content;
+  if (typeof msgContent === "string" && msgContent.trim()) return msgContent;
+  if (Array.isArray(msgContent)) {
+    const joined = msgContent
+      .map((part) => {
+        if (!part) return "";
+        if (typeof part === "string") return part;
+        if (typeof part.text === "string") return part.text;
+        if (typeof part.value === "string") return part.value;
+        if (typeof part?.text?.value === "string") return part.text.value;
+        return "";
+      })
+      .join("");
+    if (joined.trim()) return joined;
+  }
+
+  // 2) qodercli result event variants
+  if (typeof data.result === "string" && data.result.trim()) return data.result;
+  if (data.result && typeof data.result === "object") {
+    if (typeof data.result.text === "string" && data.result.text.trim()) {
+      return data.result.text;
+    }
+    if (typeof data.result.value === "string" && data.result.value.trim()) {
+      return data.result.value;
+    }
+    if (typeof data.result?.text?.value === "string" && data.result.text.value.trim()) {
+      return data.result.text.value;
+    }
+  }
+
+  // 3) Last-resort generic deep scan for textual payloads from unknown schemas.
+  return deepFindText(data);
+};
+
 // ---------------------------------------------------------------------------
 // Public: run a qodercli request
 // ---------------------------------------------------------------------------
@@ -108,6 +182,7 @@ const runQoderRequest = ({
   let settled = false;
   let timeoutHandle;
   let sawAssistantMessage = false;
+  let lastSyntheticText = "";
 
   const settle = (fn) => {
     if (settled) return;
@@ -154,19 +229,16 @@ const runQoderRequest = ({
         ) {
           if (hasVisibleAssistantText(data)) sawAssistantMessage = true;
           onChunk(data);
-        } else if (
-          data.type === "result" &&
-          data.subtype === "success" &&
-          typeof data.result === "string" &&
-          data.result.trim() &&
-          !sawAssistantMessage
-        ) {
-          // Some qodercli versions emit the final answer in result.result.
+        } else {
+          const fallbackText = extractEventText(data);
+          if (!fallbackText || sawAssistantMessage) continue;
+          if (fallbackText === lastSyntheticText) continue;
+          lastSyntheticText = fallbackText;
           onChunk({
             type: "assistant",
             subtype: "message",
             message: {
-              content: [{ type: "text", text: data.result }],
+              content: [{ type: "text", text: fallbackText }],
             },
           });
         }
@@ -198,18 +270,16 @@ const runQoderRequest = ({
       ) {
         if (hasVisibleAssistantText(data)) sawAssistantMessage = true;
         onChunk(data);
-      } else if (
-        data.type === "result" &&
-        data.subtype === "success" &&
-        typeof data.result === "string" &&
-        data.result.trim() &&
-        !sawAssistantMessage
-      ) {
+      } else {
+        const fallbackText = extractEventText(data);
+        if (!fallbackText || sawAssistantMessage) return;
+        if (fallbackText === lastSyntheticText) return;
+        lastSyntheticText = fallbackText;
         onChunk({
           type: "assistant",
           subtype: "message",
           message: {
-            content: [{ type: "text", text: data.result }],
+            content: [{ type: "text", text: fallbackText }],
           },
         });
       }

@@ -108,6 +108,9 @@ router.post('/api/chat', (req, res) => {
   res.write('data: {"type":"connection","status":"connected"}\n\n');
 
   let lastFinishReason = 'stop';
+  let emittedTextChunks = 0;
+  let emittedAnyChars = 0;
+  let lastStderr = '';
 
   const child = runQoderRequest({
     prompt, model, flags: [],
@@ -115,9 +118,26 @@ router.post('/api/chat', (req, res) => {
     onChunk: (data) => {
       const content = extractTextContent(data.message);
       if (data.message?.stop_reason) lastFinishReason = data.message.stop_reason;
-      if (content) res.write(`data: ${JSON.stringify(buildStreamChunk(content, model, id))}\n\n`);
+      if (content) {
+        emittedTextChunks += 1;
+        emittedAnyChars += content.length;
+        res.write(`data: ${JSON.stringify(buildStreamChunk(content, model, id))}\n\n`);
+      }
     },
-    onDone: (_code) => {
+    onDone: (code, stderr) => {
+      lastStderr = stderr || '';
+
+      // Cross-platform safety net:
+      // Some runtime variants may complete successfully without emitting
+      // parseable message chunks. Never silently return an empty assistant.
+      if (emittedTextChunks === 0 && emittedAnyChars === 0) {
+        const fallback =
+          code !== 0
+            ? `qodercli exited with code ${code}${lastStderr ? `: ${lastStderr.slice(0, 180)}` : ''}`
+            : 'No response text was emitted by qodercli stream (empty output).';
+        res.write(`data: ${JSON.stringify(buildStreamChunk(fallback, model, id))}\n\n`);
+        lastFinishReason = code !== 0 ? 'error' : 'stop';
+      }
       res.write(`data: ${JSON.stringify(buildDoneChunk(model, id, lastFinishReason))}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();

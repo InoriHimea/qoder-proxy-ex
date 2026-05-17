@@ -7,7 +7,7 @@ Use Qoder through any tool or library designed for OpenAI's API.
 
 - ✅ **🔌 OpenAI-Compatible**: Drop-in API replacement for apps like LangChain and Open WebUI
 - **💬 Full Chat Support**: Support for `/v1/chat/completions` (system messages, multi-turn history)
-- **🛠 OpenAI Tool Calling**: Full support for OpenAI-style function calling with custom tool definitions—works with any IDE or library that uses tools/functions
+- **🛠 OpenAI Tool Calling**: Support for OpenAI-style function calling with custom tool definitions for compatible OpenAI API clients and libraries
 - **⚡ Streaming**: Real-time SSE streaming responses without lag
 - **🔄 Smart Model Mapping**: Accepts any AI model name (gpt-4, claude-3.5, custom names) with intelligent heuristic fallback—gracefully handles unknown models instead of crashing
 - **📊 Admin Dashboard**: Built-in dark-themed web dashboard for testing, viewing live logs, and monitoring proxy health

@@ -29,7 +29,11 @@ const logger = (req, res, next) => {
       if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
       try {
         const d = JSON.parse(line.slice(6));
-        const delta = d.choices?.[0]?.delta?.content ?? d.choices?.[0]?.text ?? '';
+        const delta =
+          d.choices?.[0]?.delta?.content ??
+          d.choices?.[0]?.text ??
+          (typeof d.result === 'string' ? d.result : '') ??
+          '';
         if (delta) { streamText += delta; streamChunks++; }
       } catch { /* ignore parse errors */ }
     }

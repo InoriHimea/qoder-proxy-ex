@@ -19,11 +19,17 @@ const extractTextContent = (message) => {
   if (!message) return "";
   if (Array.isArray(message.content)) {
     return message.content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
+      .map((part) => {
+        if (!part) return "";
+        if (typeof part === "string") return part;
+        if (typeof part.text === "string") return part.text;
+        if (typeof part.value === "string") return part.value;
+        return "";
+      })
       .join("");
   }
-  return message.content || "";
+  if (typeof message.content === "string") return message.content;
+  return "";
 };
 
 // ---------------------------------------------------------------------------

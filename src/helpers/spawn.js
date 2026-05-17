@@ -236,7 +236,7 @@ const runQoderRequest = ({
 
 /**
  * Check whether qodercli is available on PATH.
- * Resolves to the version string, or null if not found / timed out.
+ * Resolves to "available", null, or "timeout".
  */
 const checkQoderCli = () =>
   new Promise((resolve) => {
@@ -253,11 +253,11 @@ const checkQoderCli = () =>
     const qoder = getQoderCliCommand();
     const child =
       process.platform === "win32"
-        ? spawn("cmd.exe", ["/c", qoder.cmd, "--version"], {
+        ? spawn("cmd.exe", ["/c", qoder.cmd, "--help"], {
             stdio: ["ignore", "pipe", "pipe"],
             env: qoderEnv(),
           })
-        : spawn(qoder.cmd, ["--version"], {
+        : spawn(qoder.cmd, ["--help"], {
             stdio: ["ignore", "pipe", "pipe"],
             env: qoderEnv(),
           });
@@ -266,11 +266,10 @@ const checkQoderCli = () =>
     child.stderr.on("data", (d) => (stderr += d.toString()));
 
     child.on("close", (code) => {
-      // Prefer stdout, fall back to stderr (some CLIs write version there).
-      // Accept any non-empty output regardless of exit code — a non-zero exit
-      // just means auth/config failed, not that the binary is missing.
-      const version = (stdout || stderr).trim();
-      finish(version || (code !== null ? "installed" : null));
+      // Lightweight availability check: any output or normal close means
+      // binary is present and launchable.
+      const output = (stdout || stderr).trim();
+      finish(output || code !== null ? "available" : null);
     });
 
     // ENOENT = binary genuinely not on PATH; any other error still means it exists
@@ -278,11 +277,11 @@ const checkQoderCli = () =>
       finish(err.code === "ENOENT" ? null : "installed");
     });
 
-    // Hard timeout of 5 s so startup is never blocked
+    // Hard timeout so startup is never blocked
     setTimeout(() => {
       child.kill();
       finish("timeout");
-    }, 20000);
+    }, 8000);
   });
 
 module.exports = { runQoderRequest, checkQoderCli };

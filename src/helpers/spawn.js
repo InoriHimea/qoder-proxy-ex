@@ -94,6 +94,7 @@ const runQoderRequest = ({
   let stderrOutput = "";
   let settled = false;
   let timeoutHandle;
+  let sawAssistantMessage = false;
 
   const settle = (fn) => {
     if (settled) return;
@@ -138,12 +139,14 @@ const runQoderRequest = ({
           data.type === "assistant" &&
           (data.subtype === "message" || data.message?.type === "message")
         ) {
+          sawAssistantMessage = true;
           onChunk(data);
         } else if (
           data.type === "result" &&
           data.subtype === "success" &&
           typeof data.result === "string" &&
-          data.result.trim()
+          data.result.trim() &&
+          !sawAssistantMessage
         ) {
           // Some qodercli versions emit the final answer in result.result.
           onChunk({
@@ -180,12 +183,14 @@ const runQoderRequest = ({
         data.type === "assistant" &&
         (data.subtype === "message" || data.message?.type === "message")
       ) {
+        sawAssistantMessage = true;
         onChunk(data);
       } else if (
         data.type === "result" &&
         data.subtype === "success" &&
         typeof data.result === "string" &&
-        data.result.trim()
+        data.result.trim() &&
+        !sawAssistantMessage
       ) {
         onChunk({
           type: "assistant",

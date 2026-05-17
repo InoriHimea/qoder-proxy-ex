@@ -256,6 +256,18 @@ const checkQoderCli = () =>
     };
 
     const qoder = getQoderCliCommand();
+
+    // In Linux containers, if we already resolved an absolute binary path and
+    // it exists, treat qodercli as available immediately. This avoids false
+    // startup timeouts caused by slow/hanging CLI help/version commands.
+    if (
+      process.platform !== "win32" &&
+      qoder.cmd.includes("/") &&
+      fs.existsSync(qoder.cmd)
+    ) {
+      return finish("available");
+    }
+
     const child =
       process.platform === "win32"
         ? spawn("cmd.exe", ["/c", qoder.cmd, "--help"], {

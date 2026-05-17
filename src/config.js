@@ -6,6 +6,10 @@ module.exports = {
   API_KEY:           process.env.PROXY_API_KEY || null,
   CORS_ORIGIN:       process.env.CORS_ORIGIN || '*',
   QODER_TIMEOUT_MS:  parseInt(process.env.QODER_TIMEOUT_MS) || 120_000,
+  QODER_MAX_OUTPUT_TOKENS: (() => {
+    const v = (process.env.QODER_MAX_OUTPUT_TOKENS || '').trim().toLowerCase();
+    return v === '16k' || v === '32k' ? v : '16k';
+  })(),
   QODER_PAT:         process.env.QODER_PERSONAL_ACCESS_TOKEN || process.env.QODER_API_KEY || null,
   PUBLIC_BASE_URL:   process.env.PUBLIC_BASE_URL || null,
 

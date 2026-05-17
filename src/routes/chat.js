@@ -12,7 +12,7 @@ const {
   buildFullChatResponseWithTools,
 } = require("../helpers/format");
 const { runQoderRequest } = require("../helpers/spawn");
-const { QODER_TIMEOUT_MS } = require("../config");
+const { QODER_TIMEOUT_MS, QODER_MAX_OUTPUT_TOKENS } = require("../config");
 const {
   buildPromptWithTools,
   parseToolCallFromText,
@@ -105,6 +105,8 @@ router.post("/", (req, res) => {
   if (max_tokens != null) {
     if (max_tokens >= 32000) flags.push("--max-output-tokens", "32k");
     else if (max_tokens >= 16000) flags.push("--max-output-tokens", "16k");
+  } else if (QODER_MAX_OUTPUT_TOKENS) {
+    flags.push("--max-output-tokens", QODER_MAX_OUTPUT_TOKENS);
   }
 
   if (stream) {

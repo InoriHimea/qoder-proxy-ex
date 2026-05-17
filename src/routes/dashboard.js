@@ -113,7 +113,7 @@ router.post('/api/chat', (req, res) => {
   let lastStderr = '';
 
   const child = runQoderRequest({
-    prompt, model, flags: [],
+    prompt, model, flags: config.QODER_MAX_OUTPUT_TOKENS ? ['--max-output-tokens', config.QODER_MAX_OUTPUT_TOKENS] : [],
     timeoutMs: config.QODER_TIMEOUT_MS,
     onChunk: (data) => {
       const content = extractTextContent(data.message);

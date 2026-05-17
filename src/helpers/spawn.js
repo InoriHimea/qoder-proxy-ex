@@ -63,6 +63,19 @@ const parseStreamJsonLine = (line) => {
   }
 };
 
+const hasVisibleAssistantText = (data) => {
+  const content = data?.message?.content;
+  if (typeof content === "string") return content.trim().length > 0;
+  if (!Array.isArray(content)) return false;
+  return content.some((part) => {
+    if (!part) return false;
+    if (typeof part === "string") return part.trim().length > 0;
+    if (typeof part.text === "string" && part.text.trim()) return true;
+    if (typeof part.value === "string" && part.value.trim()) return true;
+    return false;
+  });
+};
+
 // ---------------------------------------------------------------------------
 // Public: run a qodercli request
 // ---------------------------------------------------------------------------
@@ -139,7 +152,7 @@ const runQoderRequest = ({
           data.type === "assistant" &&
           (data.subtype === "message" || data.message?.type === "message")
         ) {
-          sawAssistantMessage = true;
+          if (hasVisibleAssistantText(data)) sawAssistantMessage = true;
           onChunk(data);
         } else if (
           data.type === "result" &&
@@ -183,7 +196,7 @@ const runQoderRequest = ({
         data.type === "assistant" &&
         (data.subtype === "message" || data.message?.type === "message")
       ) {
-        sawAssistantMessage = true;
+        if (hasVisibleAssistantText(data)) sawAssistantMessage = true;
         onChunk(data);
       } else if (
         data.type === "result" &&

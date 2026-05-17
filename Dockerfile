@@ -7,8 +7,12 @@ ENV QODERCLI_BIN="/usr/local/bin/qodercli"
 # node:20-slim is Debian-based (glibc) which is required by qodercli's Bun runtime.
 # Alpine (musl libc) is incompatible with Bun native binaries.
 RUN npm install -g @qoder-ai/qodercli \
-  && command -v qodercli \
-  && qodercli --version
+  && qodercli --version || true
+
+# Disable qodercli auto-updates so it never tries to download a new version
+# on startup inside the container (saves memory, eliminates update-induced delays).
+RUN mkdir -p /root/.qoder \
+  && echo '{"autoUpdates":false}' > /root/.qoder.json
 
 WORKDIR /app
 

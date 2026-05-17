@@ -8,19 +8,33 @@ const config = require("../config");
 // so we always pass it under the name qodercli actually looks for.
 const qoderEnv = () => ({
   ...process.env,
+  // Always pass the PAT under the name qodercli expects, regardless of which
+  // env var name the hosting platform used.
   ...(config.QODER_PAT
     ? { QODER_PERSONAL_ACCESS_TOKEN: config.QODER_PAT }
     : {}),
+  // Prevent qodercli from trying to open a browser (headless container has none).
+  NO_BROWSER: "1",
+  // Signal a non-interactive / CI environment so qodercli skips TUI features.
+  CI: "1",
+  // Ensure HOME is set so qodercli can find ~/.qoder config (auto-updates off).
+  HOME: process.env.HOME || "/root",
 });
 
 const getQoderCliCommand = () => {
-  if (process.platform === "win32") return { cmd: "qodercli.cmd", viaCmd: true };
+  if (process.platform === "win32")
+    return { cmd: "qodercli.cmd", viaCmd: true };
 
   // Allow explicit override in container/runtime env.
-  if (process.env.QODERCLI_BIN) return { cmd: process.env.QODERCLI_BIN, viaCmd: false };
+  if (process.env.QODERCLI_BIN)
+    return { cmd: process.env.QODERCLI_BIN, viaCmd: false };
 
   // Common global npm binary locations in Linux containers.
-  const candidates = ["/usr/local/bin/qodercli", "/usr/bin/qodercli", "qodercli"];
+  const candidates = [
+    "/usr/local/bin/qodercli",
+    "/usr/bin/qodercli",
+    "qodercli",
+  ];
   for (const c of candidates) {
     if (c.includes("/") && fs.existsSync(c)) return { cmd: c, viaCmd: false };
   }
@@ -141,7 +155,10 @@ const extractEventText = (data) => {
     if (typeof data.result.value === "string" && data.result.value.trim()) {
       return data.result.value;
     }
-    if (typeof data.result?.text?.value === "string" && data.result.text.value.trim()) {
+    if (
+      typeof data.result?.text?.value === "string" &&
+      data.result.text.value.trim()
+    ) {
       return data.result.text.value;
     }
   }

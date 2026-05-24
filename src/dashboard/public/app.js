@@ -6,7 +6,7 @@ const state = {
   page: 'endpoints',
   config: {},
   models: [],
-  chat: { messages: [], model: 'auto', streaming: false },
+  chat: { messages: [], model: 'auto', streaming: false, streamMode: 'stream' },
   logs: { entries: [], filter: '', autoRefresh: false, timer: null, expanded: null },
   sysLogs: { entries: [], autoRefresh: false, timer: null },
 };
@@ -229,6 +229,10 @@ function renderPlayground() {
           </div>
         </div>
         <div class="pg-toolbar-right">
+          <select id="stream-mode" class="btn btn-ghost" style="font-size:12px" onchange="setStreamMode(this.value)">
+            <option value="stream">Stream</option>
+            <option value="non-stream">Non-stream</option>
+          </select>
           <button class="btn btn-ghost" style="font-size:12px" onclick="clearChat()">Clear</button>
         </div>
       </div>
@@ -242,6 +246,8 @@ function renderPlayground() {
   buildModelList(state.models);
   renderMessages();
   selectModel(state.chat.model);
+  const mode = $('stream-mode');
+  if (mode) mode.value = state.chat.streamMode;
 
   // Close dropdown on outside click
   document.addEventListener('click', outsideDropdownClose);
@@ -305,6 +311,10 @@ window.selectModel = (id) => {
   closeModelDropdown();
 };
 
+window.setStreamMode = (mode) => {
+  state.chat.streamMode = mode === 'non-stream' ? 'non-stream' : 'stream';
+};
+
 function renderMessages() {
   const area = $('chat-area');
   if (!area) return;
@@ -343,10 +353,18 @@ window.sendMessage = async () => {
   state.chat.messages.push(assistant);
 
   try {
-    const res = await fetch('/dashboard/api/chat', {
+    const headers = { 'Content-Type': 'application/json' };
+    if (state.config.authEnabled) {
+      if (!state.config.proxyApiKey) throw new Error('Proxy API key is required for /v1 access');
+      headers.Authorization = `Bearer ${state.config.proxyApiKey}`;
+    }
+
+    const useStream = state.chat.streamMode === 'stream';
+    const res = await fetch('/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ 
+        stream: useStream,
         messages: state.chat.messages.slice(0, -1), // All messages except the empty assistant message we just added
         model: state.chat.model 
       }),
@@ -357,38 +375,49 @@ window.sendMessage = async () => {
       throw new Error(`HTTP ${res.status}: ${errorText.includes('Not authenticated') ? 'Not authenticated - please refresh and login' : 'Server error'}`);
     }
 
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = '';
-    let chunkCount = 0;
-    
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    if (useStream) {
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = '';
       
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n'); buf = lines.pop() || '';
-      
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6); 
-        if (raw === '[DONE]') break;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
         
-        try {
-          const chunk = JSON.parse(raw);
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6); 
+          if (raw === '[DONE]') break;
           
-          // Skip initial connection message
-          if (chunk.type === 'connection') continue;
-          
-          const delta = chunk.choices?.[0]?.delta?.content ?? '';
-          if (delta) { 
-            assistant.content += delta; 
-            chunkCount++;
-            renderMessages();
+          try {
+            const chunk = JSON.parse(raw);
+            
+            // Skip initial connection message
+            if (chunk.type === 'connection') continue;
+            
+            const delta = chunk.choices?.[0]?.delta?.content ?? '';
+            if (delta) { 
+              assistant.content += delta; 
+              renderMessages();
+            }
+          } catch (e) { 
+            console.warn('Failed to parse SSE chunk:', raw); 
           }
-        } catch (e) { 
-          console.warn('Failed to parse SSE chunk:', raw); 
         }
       }
+    } else {
+      const data = await res.json();
+      const message = data?.choices?.[0]?.message;
+      if (typeof message?.content === 'string' && message.content.length) {
+        assistant.content = message.content;
+      } else if (Array.isArray(message?.tool_calls) && message.tool_calls.length) {
+        assistant.content = `Tool call requested: ${message.tool_calls[0].function?.name || 'unknown'}`;
+      } else {
+        assistant.content = '(empty)';
+      }
+      renderMessages();
     }
   } catch (err) {
     console.error('Chat error:', err);

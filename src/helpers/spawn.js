@@ -71,30 +71,23 @@ const getQoderCliCommand = () => {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const spawnQoderCli = (prompt, model, flags = []) => {
+const spawnQoderCli = (model, flags = []) => {
   const qoder = getQoderCliCommand();
 
+  const args = ["-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
+  if (model) args.push("--model", model);
+  if (flags.length) args.push(...flags);
+  // Using -p (non-interactive) and no positional argument tells qodercli to read prompt from stdin.
+  args.push("-p");
+
   if (process.platform === "win32") {
-    // On Windows, command line limit is 32KB. We use an attachment.
-    // Note: Qoder's internal file reader has a 256KB limit, so on Windows, prompts >256KB will fail.
-    const attachmentPath = createPromptAttachment(prompt);
-    const args = ["/c", qoder.cmd, "--attachment", attachmentPath, "-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
-    if (model) args.push("--model", model);
-    if (flags.length) args.push(...flags);
-    args.push("--", ATTACHMENT_INSTRUCTION);
-    return spawn("cmd.exe", args, {
-      stdio: ["ignore", "pipe", "pipe"],
+    return spawn("cmd.exe", ["/c", qoder.cmd, ...args], {
+      stdio: ["pipe", "pipe", "pipe"],
       env: qoderEnv(),
     });
   } else {
-    // On Linux/Mac, ARG_MAX is ~2MB, so we pass the prompt directly.
-    // This entirely avoids Qoder's 256KB attachment-reading limit.
-    const args = ["-f", "stream-json"];
-    if (model) args.push("--model", model);
-    if (flags.length) args.push(...flags);
-    args.push("--", prompt);
     return spawn(qoder.cmd, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: qoderEnv(),
     });
   }
@@ -235,7 +228,13 @@ const runQoderRequest = ({
     fn();
   };
 
-  const child = spawnQoderCli(prompt, model, flags);
+  const child = spawnQoderCli(model, flags);
+
+  // Write prompt to stdin and close it
+  if (child.stdin && child.stdin.writable) {
+    child.stdin.write(prompt + "\n");
+    child.stdin.end();
+  }
 
   child.on("error", (err) => {
     console.error("[qodercli error]", err.message);

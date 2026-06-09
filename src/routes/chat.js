@@ -102,6 +102,12 @@ router.post("/", (req, res) => {
   const id = newId("chatcmpl");
 
   const flags = [];
+  
+  const reasoning_effort = req.body.reasoning_effort;
+  if (reasoning_effort) {
+    flags.push("--reasoning-effort", reasoning_effort);
+  }
+
   if (max_tokens != null) {
     if (max_tokens >= 32000) flags.push("--max-output-tokens", "32k");
     else if (max_tokens >= 16000) flags.push("--max-output-tokens", "16k");

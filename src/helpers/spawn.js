@@ -73,9 +73,11 @@ const getQoderCliCommand = () => {
 
 const spawnQoderCli = (prompt, model, flags = []) => {
   const qoder = getQoderCliCommand();
-  const attachmentPath = createPromptAttachment(prompt);
 
   if (process.platform === "win32") {
+    // On Windows, command line limit is 32KB. We use an attachment.
+    // Note: Qoder's internal file reader has a 256KB limit, so on Windows, prompts >256KB will fail.
+    const attachmentPath = createPromptAttachment(prompt);
     const args = ["/c", qoder.cmd, "--attachment", attachmentPath, "-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
@@ -85,10 +87,12 @@ const spawnQoderCli = (prompt, model, flags = []) => {
       env: qoderEnv(),
     });
   } else {
-    const args = ["--attachment", attachmentPath, "-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
+    // On Linux/Mac, ARG_MAX is ~2MB, so we pass the prompt directly.
+    // This entirely avoids Qoder's 256KB attachment-reading limit.
+    const args = ["-f", "stream-json"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
-    args.push("--", ATTACHMENT_INSTRUCTION);
+    args.push("--", prompt);
     return spawn(qoder.cmd, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: qoderEnv(),

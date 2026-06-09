@@ -212,7 +212,7 @@ const runQoderRequest = ({
   prompt,
   model,
   flags = [],
-  timeoutMs = 120_000,
+  timeoutMs = 600_000,
   onChunk,
   onDone,
   onError,

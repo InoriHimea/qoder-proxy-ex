@@ -76,7 +76,7 @@ const spawnQoderCli = (prompt, model, flags = []) => {
   const attachmentPath = createPromptAttachment(prompt);
 
   if (process.platform === "win32") {
-    const args = ["/c", qoder.cmd, "--attachment", attachmentPath, "-f", "stream-json"];
+    const args = ["/c", qoder.cmd, "--attachment", attachmentPath, "-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
     args.push("--", ATTACHMENT_INSTRUCTION);
@@ -85,7 +85,7 @@ const spawnQoderCli = (prompt, model, flags = []) => {
       env: qoderEnv(),
     });
   } else {
-    const args = ["--attachment", attachmentPath, "-f", "stream-json"];
+    const args = ["--attachment", attachmentPath, "-f", "stream-json", "--dangerously-skip-permissions", "--permission-mode", "bypassPermissions"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
     args.push("--", ATTACHMENT_INSTRUCTION);

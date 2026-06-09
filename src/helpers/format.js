@@ -66,6 +66,12 @@ const QODER_MODELS = [
     description: "Paid tier — high-performance model for demanding tasks.",
   },
   {
+    id: "qmodel_latest",
+    label: "Qwen3.7-Max",
+    tier: "new",
+    description: "New model — Qwen 3.7 Max (Alibaba).",
+  },
+  {
     id: "qmodel",
     label: "Qwen3.6-Plus",
     tier: "new",

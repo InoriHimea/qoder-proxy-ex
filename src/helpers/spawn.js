@@ -3,6 +3,23 @@ const fs = require("fs");
 const { addSystem } = require("../store/logStore");
 const config = require("../config");
 
+const path = require("path");
+
+const ATTACHMENT_INSTRUCTION =
+  'Answer the attached OpenAI-compatible chat completion request. Return only the final assistant message content.';
+
+function createPromptAttachment(prompt) {
+  const tmpDir = require("os").tmpdir();
+  const promptDir = path.join(tmpDir, 'qoder-proxy-prompts');
+  fs.mkdirSync(promptDir, { recursive: true });
+  const filePath = path.join(
+    promptDir,
+    `prompt-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`
+  );
+  fs.writeFileSync(filePath, prompt, 'utf8');
+  return filePath;
+}
+
 const isBenignQoderStderr = (text) => {
   if (!text) return false;
   return (
@@ -56,21 +73,22 @@ const getQoderCliCommand = () => {
 
 const spawnQoderCli = (prompt, model, flags = []) => {
   const qoder = getQoderCliCommand();
+  const attachmentPath = createPromptAttachment(prompt);
+
   if (process.platform === "win32") {
-    // On Windows, pass a cmd-safe prompt to avoid shell interpretation of
-    // special characters (&, |, >, <, ^, ").
-    const safePrompt = prompt.replace(/"/g, '\\"').replace(/[&|<>^]/g, "^$&");
-    const args = ["/c", qoder.cmd, "-p", safePrompt, "-f", "stream-json"];
+    const args = ["/c", qoder.cmd, "--attachment", attachmentPath, "-f", "stream-json"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
+    args.push("--", ATTACHMENT_INSTRUCTION);
     return spawn("cmd.exe", args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: qoderEnv(),
     });
   } else {
-    const args = ["-p", prompt, "-f", "stream-json"];
+    const args = ["--attachment", attachmentPath, "-f", "stream-json"];
     if (model) args.push("--model", model);
     if (flags.length) args.push(...flags);
+    args.push("--", ATTACHMENT_INSTRUCTION);
     return spawn(qoder.cmd, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: qoderEnv(),

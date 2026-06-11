@@ -8,12 +8,14 @@ RUN npm install -g @qoder-ai/qodercli @qodercn-ai/qoderclicn \
   && qodercli --version || true \
   && qoderclicn --version || true
 
-# Disable qodercli auto-updates so it never tries to download a new version
-# on startup inside the container (saves memory, eliminates update-induced delays).
+# Disable qodercli auto-updates
 RUN mkdir -p /root/.qoder \
   && echo '{"autoUpdates":false}' > /root/.qoder.json
 
 WORKDIR /app
+
+# Create data directory for persistent config.json
+RUN mkdir -p /app/data
 
 # Install production deps first (layer caching)
 COPY package*.json ./

@@ -1,6 +1,6 @@
 const express = require("express");
 const { checkQoderCli } = require("../helpers/spawn");
-const { QODER_MODELS } = require("../helpers/format");
+const { getQoderModels } = require("../helpers/format");
 
 const router = express.Router();
 
@@ -116,11 +116,12 @@ const OPENAI_ALIASES = [
 const TS = 1700000000;
 
 router.get("/models", (_req, res) => {
-  const nativeModels = QODER_MODELS.map((m) => ({
+  const models = getQoderModels();
+  const nativeModels = models.map((m) => ({
     id: m.id,
     object: "model",
     created: TS,
-    owned_by: `qoder-${m.tier}`,
+    owned_by: `qoder-${m.tier || 'paid'}`,
     qoder: {
       label: m.label,
       tier: m.tier,

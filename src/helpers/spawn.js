@@ -3,6 +3,8 @@ const fs = require("fs");
 const { addSystem } = require("../store/logStore");
 const config = require("../config");
 
+const { loadConfig } = require("../store/configStore");
+
 const path = require("path");
 
 const ATTACHMENT_INSTRUCTION =
@@ -33,15 +35,16 @@ const isBenignQoderStderr = (text) => {
 // config.QODER_PAT normalises both QODER_PERSONAL_ACCESS_TOKEN and QODER_API_KEY,
 // so we always pass it under the name qodercli actually looks for.
 const qoderEnv = () => {
-  const backend = (process.env.CLI_BACKEND || "global").toLowerCase();
+  const settings = loadConfig();
+  const backend = settings.backend || "global";
   const tokenVar = backend === "cn" ? "QODERCN_PERSONAL_ACCESS_TOKEN" : "QODER_PERSONAL_ACCESS_TOKEN";
   
   return {
     ...process.env,
     // Always pass the PAT under the name qodercli expects, regardless of which
     // env var name the hosting platform used.
-    ...(config.QODER_PAT
-      ? { [tokenVar]: config.QODER_PAT }
+    ...(settings.token
+      ? { [tokenVar]: settings.token }
       : {}),
     // Increase memory limit for the CLI to handle massive prompts
     NODE_OPTIONS: (process.env.NODE_OPTIONS || "") + " --max-old-space-size=4096",
@@ -55,7 +58,8 @@ const qoderEnv = () => {
 };
 
 const getQoderCliCommand = () => {
-  const backend = (process.env.CLI_BACKEND || "global").toLowerCase();
+  const settings = loadConfig();
+  const backend = settings.backend || "global";
   const defaultCmd = backend === "cn" ? "qoderclicn" : "qodercli";
 
   if (process.platform === "win32")

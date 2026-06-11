@@ -39,6 +39,8 @@ const qoderEnv = () => ({
   ...(config.QODER_PAT
     ? { QODER_PERSONAL_ACCESS_TOKEN: config.QODER_PAT }
     : {}),
+  // Increase memory limit for the CLI to handle massive prompts
+  NODE_OPTIONS: (process.env.NODE_OPTIONS || "") + " --max-old-space-size=4096",
   // Prevent qodercli from trying to open a browser (headless container has none).
   NO_BROWSER: "1",
   // Signal a non-interactive / CI environment so qodercli skips TUI features.
@@ -48,8 +50,11 @@ const qoderEnv = () => ({
 });
 
 const getQoderCliCommand = () => {
+  const backend = (process.env.CLI_BACKEND || "global").toLowerCase();
+  const defaultCmd = backend === "cn" ? "qoderclicn" : "qodercli";
+
   if (process.platform === "win32")
-    return { cmd: "qodercli.cmd", viaCmd: true };
+    return { cmd: defaultCmd + ".cmd", viaCmd: true };
 
   // Allow explicit override in container/runtime env.
   if (process.env.QODERCLI_BIN)
@@ -57,14 +62,14 @@ const getQoderCliCommand = () => {
 
   // Common global npm binary locations in Linux containers.
   const candidates = [
-    "/usr/local/bin/qodercli",
-    "/usr/bin/qodercli",
-    "qodercli",
+    `/usr/local/bin/${defaultCmd}`,
+    `/usr/bin/${defaultCmd}`,
+    defaultCmd,
   ];
   for (const c of candidates) {
     if (c.includes("/") && fs.existsSync(c)) return { cmd: c, viaCmd: false };
   }
-  return { cmd: "qodercli", viaCmd: false };
+  return { cmd: defaultCmd, viaCmd: false };
 };
 
 // ---------------------------------------------------------------------------

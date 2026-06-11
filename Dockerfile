@@ -3,11 +3,11 @@ FROM node:20-slim
 ENV PATH="/usr/local/bin:${PATH}"
 ENV QODERCLI_BIN="/usr/local/bin/qodercli"
 
-# Install qodercli globally — uses QODER_PERSONAL_ACCESS_TOKEN env var at runtime for auth.
+# Install qodercli and qoderclicn globally
 # node:20-slim is Debian-based (glibc) which is required by qodercli's Bun runtime.
-# Alpine (musl libc) is incompatible with Bun native binaries.
-RUN npm install -g @qoder-ai/qodercli \
-  && qodercli --version || true
+RUN npm install -g @qoder-ai/qodercli @qodercn-ai/qoderclicn \
+  && qodercli --version || true \
+  && qoderclicn --version || true
 
 # Disable qodercli auto-updates so it never tries to download a new version
 # on startup inside the container (saves memory, eliminates update-induced delays).

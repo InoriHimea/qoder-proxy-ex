@@ -32,22 +32,27 @@ const isBenignQoderStderr = (text) => {
 // Build the environment for every qodercli child process.
 // config.QODER_PAT normalises both QODER_PERSONAL_ACCESS_TOKEN and QODER_API_KEY,
 // so we always pass it under the name qodercli actually looks for.
-const qoderEnv = () => ({
-  ...process.env,
-  // Always pass the PAT under the name qodercli expects, regardless of which
-  // env var name the hosting platform used.
-  ...(config.QODER_PAT
-    ? { QODER_PERSONAL_ACCESS_TOKEN: config.QODER_PAT }
-    : {}),
-  // Increase memory limit for the CLI to handle massive prompts
-  NODE_OPTIONS: (process.env.NODE_OPTIONS || "") + " --max-old-space-size=4096",
-  // Prevent qodercli from trying to open a browser (headless container has none).
-  NO_BROWSER: "1",
-  // Signal a non-interactive / CI environment so qodercli skips TUI features.
-  CI: "1",
-  // Ensure HOME is set so qodercli can find ~/.qoder config (auto-updates off).
-  HOME: process.env.HOME || "/root",
-});
+const qoderEnv = () => {
+  const backend = (process.env.CLI_BACKEND || "global").toLowerCase();
+  const tokenVar = backend === "cn" ? "QODERCN_PERSONAL_ACCESS_TOKEN" : "QODER_PERSONAL_ACCESS_TOKEN";
+  
+  return {
+    ...process.env,
+    // Always pass the PAT under the name qodercli expects, regardless of which
+    // env var name the hosting platform used.
+    ...(config.QODER_PAT
+      ? { [tokenVar]: config.QODER_PAT }
+      : {}),
+    // Increase memory limit for the CLI to handle massive prompts
+    NODE_OPTIONS: (process.env.NODE_OPTIONS || "") + " --max-old-space-size=4096",
+    // Prevent qodercli from trying to open a browser (headless container has none).
+    NO_BROWSER: "1",
+    // Signal a non-interactive / CI environment so qodercli skips TUI features.
+    CI: "1",
+    // Ensure HOME is set so qodercli can find ~/.qoder config (auto-updates off).
+    HOME: process.env.HOME || "/root",
+  };
+};
 
 const getQoderCliCommand = () => {
   const backend = (process.env.CLI_BACKEND || "global").toLowerCase();

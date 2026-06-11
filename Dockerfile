@@ -1,7 +1,6 @@
 FROM node:20-slim
 
 ENV PATH="/usr/local/bin:${PATH}"
-ENV QODERCLI_BIN="/usr/local/bin/qodercli"
 
 # Install qodercli and qoderclicn globally
 # node:20-slim is Debian-based (glibc) which is required by qodercli's Bun runtime.

@@ -12,7 +12,49 @@ const { loadConfig, saveConfig } = require('../store/configStore');
 const router     = express.Router();
 const PUBLIC_DIR = path.join(__dirname, '..', 'dashboard', 'public');
 
-// ... [rest of the file remains similar but uses dynamic data] ...
+const statusCache = {
+  checkedAt: 0,
+  version: null,
+};
+
+const refreshQoderStatus = async () => {
+  const version = await checkQoderCli();
+  statusCache.version = version;
+  statusCache.checkedAt = Date.now();
+  return version;
+};
+
+refreshQoderStatus().catch(() => {});
+
+// ── Static assets ────────────────────────────────────────────────────────────
+router.use('/static', express.static(PUBLIC_DIR));
+
+// ── Public routes (no auth) ──────────────────────────────────────────────────
+
+router.get('/login', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+
+router.post('/login', express.urlencoded({ extended: false }), (req, res) => {
+  const { password } = req.body || {};
+  if (password && password === config.DASHBOARD_PASSWORD) {
+    setCookie(res, createToken());
+    addSystem('Dashboard login successful', 'info', 'auth');
+    return res.redirect('/dashboard/');
+  }
+  addSystem('Dashboard login failed — wrong password', 'warn', 'auth');
+  res.redirect('/dashboard/login?error=1');
+});
+
+router.get('/logout', (req, res) => {
+  clearCookie(res);
+  addSystem('Dashboard logout', 'info', 'auth');
+  res.redirect('/dashboard/login');
+});
+
+// ── Auth wall ────────────────────────────────────────────────────────────────
+router.use(dashboardAuth);
+
+// ── SPA shell ────────────────────────────────────────────────────────────────
+router.get('/', (_req, res)  => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 // ── API — config ─────────────────────────────────────────────────────────────
 router.get('/api/config', (req, res) => {
@@ -29,7 +71,7 @@ router.get('/api/config', (req, res) => {
 // ── API — settings (new) ─────────────────────────────────────────────────────
 router.get('/api/settings', (req, res) => {
   const settings = loadConfig();
-  // Mask token for safety (e.g., sk-...last4)
+  // Mask token for safety
   const maskedToken = settings.token ? 
     (settings.token.length > 8 ? `${settings.token.slice(0, 6)}...${settings.token.slice(-4)}` : '******') : '';
   
@@ -41,13 +83,12 @@ router.get('/api/settings', (req, res) => {
   });
 });
 
-router.post('/api/settings', express.json(), (req, res) => {
+router.post('/api/settings', (req, res) => {
   const { backend, token, models } = req.body;
   const current = loadConfig();
   
   const next = {
     backend: backend || current.backend,
-    // If token is just asterisks or same as masked, don't update it
     token: (token && !token.includes('...')) ? token : current.token,
     models: Array.isArray(models) ? models : current.models
   };
@@ -58,11 +99,26 @@ router.post('/api/settings', express.json(), (req, res) => {
 });
 
 // ── API — status ─────────────────────────────────────────────────────────────
-// ... existing status handler ...
+router.get('/api/status', async (_req, res) => {
+  const now = Date.now();
+  if (now - statusCache.checkedAt > 30000) {
+    refreshQoderStatus().catch(() => {});
+  }
+  const version = statusCache.version;
+  const mem     = process.memoryUsage();
+  res.json({
+    status:      version && version !== 'timeout' ? 'ok' : 'degraded',
+    qodercli:    version || 'unavailable',
+    uptime:      process.uptime(),
+    memoryMB:    (mem.rss / 1024 / 1024).toFixed(1),
+    heapUsedMB:  (mem.heapUsed / 1024 / 1024).toFixed(1),
+    timestamp:   new Date().toISOString(),
+    version:     pkg.version,
+  });
+});
 
 // ── API — models ─────────────────────────────────────────────────────────────
 router.get('/api/models', (_req, res) => res.json({ models: getQoderModels() }));
-
 
 // ── API — playground chat (SSE) ──────────────────────────────────────────────
 router.post('/api/chat', (req, res) => {
@@ -79,13 +135,11 @@ router.post('/api/chat', (req, res) => {
   res.setHeader('Connection',      'keep-alive');
   res.setHeader('X-Accel-Buffering','no');
 
-  // Send initial SSE headers to establish connection
   res.write('data: {"type":"connection","status":"connected"}\n\n');
 
   let lastFinishReason = 'stop';
   let emittedTextChunks = 0;
   let emittedAnyChars = 0;
-  let lastStderr = '';
 
   const child = runQoderRequest({
     prompt, model, flags: config.QODER_MAX_OUTPUT_TOKENS ? ['--max-output-tokens', config.QODER_MAX_OUTPUT_TOKENS] : [],
@@ -100,18 +154,10 @@ router.post('/api/chat', (req, res) => {
       }
     },
     onDone: (code, stderr) => {
-      lastStderr = stderr || '';
-
-      // Cross-platform safety net:
-      // Some runtime variants may complete successfully without emitting
-      // parseable message chunks. Never silently return an empty assistant.
       if (emittedTextChunks === 0 && emittedAnyChars === 0) {
-        const fallback =
-          code !== 0
-            ? `qodercli exited with code ${code}${lastStderr ? `: ${lastStderr.slice(0, 180)}` : ''}`
-            : 'No response text was emitted by qodercli stream (empty output).';
+        const fallback = code !== 0 ? `qodercli exited with code ${code}: ${stderr.slice(0, 180)}` : 'Empty output';
         res.write(`data: ${JSON.stringify(buildStreamChunk(fallback, model, id))}\n\n`);
-        lastFinishReason = code !== 0 ? 'error' : 'stop';
+        lastFinishReason = 'error';
       }
       res.write(`data: ${JSON.stringify(buildDoneChunk(model, id, lastFinishReason))}\n\n`);
       res.write('data: [DONE]\n\n');
